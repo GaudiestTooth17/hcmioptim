@@ -1,6 +1,5 @@
 import numpy as np
 from typing import Callable, Sequence, Tuple, Union
-from itertools import product
 Number = Union[int, float]
 Genotype = np.ndarray
 
