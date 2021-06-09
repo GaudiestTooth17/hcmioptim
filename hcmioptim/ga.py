@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Callable, Sequence, Tuple, Union
+from typing import Callable, List, Sequence, Tuple, Union
 Number = Union[int, float]
 Genotype = np.ndarray
 
@@ -9,7 +9,7 @@ def make_optimizer(fitness_fn: Callable[[Genotype], Number],
                                          Sequence[Genotype]],
                    max_fitness: Number,
                    starting_population: Sequence[Genotype])\
-                       -> Callable[[], Sequence[Tuple[Number, Genotype]]]:
+                       -> Callable[[], List[Tuple[Number, Genotype]]]:
     """
     Create a closure that executes 1 genetic algorithm step and saves the data needed to take another step.
 
@@ -19,11 +19,11 @@ def make_optimizer(fitness_fn: Callable[[Genotype], Number],
                  and return a vector of genotypes to be the next generation.
     max_fitness: The best estimate of the highest value fitness_fn can return.
     starting_population: The population of genotypes that the optimizer begins with.
-    return: A closure that accepts no arguments and returns the a list of genotypes associated with their fitnesses.
+    return: A closure that accepts no arguments and returns a list of genotypes associated with their fitnesses.
     """
     population = starting_population
 
-    def optimizer_step() -> Sequence[Tuple[Number, Genotype]]:
+    def optimizer_step() -> List[Tuple[Number, Genotype]]:
         nonlocal population
         fitness_to_genotype = [(fitness_fn(genotype), genotype) for genotype in population]
         population = next_gen_fn(max_fitness, fitness_to_genotype)
