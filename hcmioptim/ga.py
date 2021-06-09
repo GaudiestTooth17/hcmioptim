@@ -73,9 +73,3 @@ def crossover(alpha: Genotype, beta: Genotype) -> Tuple[Genotype, Genotype]:
     child1 = np.zeros(size, dtype=type_)
     child1[:locus], child1[locus:] = beta[:locus], alpha[locus:]
     return child0, child1
-
-
-def mutate(population: Sequence[Genotype], prob: float) -> None:
-    for i, j in product(range(len(population)), range(population[0].shape[0])):
-        if np.random.rand() < prob:
-            population[i][j] += np.random.choice((-1, 1))

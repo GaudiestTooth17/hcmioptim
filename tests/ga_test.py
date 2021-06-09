@@ -1,7 +1,14 @@
 from typing import Sequence, Tuple
+from itertools import product
 from unittest import TestCase
 import numpy as np
-from hcmioptim.ga import Number, make_optimizer, Genotype, mutate, roullete_wheel_selection, crossover
+from hcmioptim.ga import Number, make_optimizer, Genotype, roullete_wheel_selection, crossover
+
+
+def test_mutate(population: Sequence[Genotype], prob: float) -> None:
+    for i, j in product(range(len(population)), range(population[0].shape[0])):
+        if np.random.rand() < prob:
+            population[i][j] += np.random.choice((-1, 1))
 
 
 def test_fitness(genotype: Genotype) -> int:
@@ -17,7 +24,7 @@ def test_next_gen(max_fitness, population: Sequence[Tuple[Number, Genotype]]) ->
                     for i in range(len(population)//2))
     child_pairs = (crossover(couple[0], couple[1]) for couple in parent_pairs)
     children = tuple(child for pair in child_pairs for child in pair)
-    mutate(children, .25)
+    test_mutate(children, .25)
     return children
 
 
