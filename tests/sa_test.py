@@ -24,7 +24,7 @@ class TestSA(TestCase):
         max_steps = 1000
         sigma0 = np.ones(sequence_length, dtype='int')
         optimizer_step = make_sa_optimizer(sequence_objective, make_fast_schedule(T0),
-                                           sequence_neighbor, sigma0)
+                                           sequence_neighbor, sigma0)  # type: ignore
 
         best_solution = None
         energies = np.zeros(max_steps)
