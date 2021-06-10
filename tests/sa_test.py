@@ -1,6 +1,6 @@
 from unittest import TestCase
 import numpy as np
-from hcmioptim.sa import make_sa_optimizer, make_fast_schedule
+from hcmioptim.sa import SAOptimizer, make_fast_schedule
 
 
 def sequence_objective(sigma: np.ndarray) -> int:
@@ -23,13 +23,13 @@ class TestSA(TestCase):
         T0 = 100.0
         max_steps = 1000
         sigma0 = np.ones(sequence_length, dtype='int')
-        optimizer_step = make_sa_optimizer(sequence_objective, make_fast_schedule(T0),
-                                           sequence_neighbor, sigma0)  # type: ignore
+        optimizer = SAOptimizer(sequence_objective, make_fast_schedule(T0),
+                                sequence_neighbor, sigma0, False)
 
         best_solution = None
         energies = np.zeros(max_steps)
         for step in range(max_steps):
-            best_solution, energy = optimizer_step()
+            best_solution, energy = optimizer.step()
             energies[step] = energy
 
         self.assertIsNotNone(best_solution, 'Solution is None.')

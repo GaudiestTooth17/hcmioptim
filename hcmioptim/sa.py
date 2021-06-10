@@ -1,52 +1,64 @@
 from hcmioptim.ga import Number
-from typing import Callable, Sequence, Union, Tuple
+from typing import Callable, Tuple
 import numpy as np
 Solution = np.ndarray
 
 
-def make_sa_optimizer(objective: Callable[[Solution], Number],
-                      next_temp: Callable[[], float],
-                      neighbor: Callable[[Solution], Solution],
-                      sigma0: Solution) -> Callable[[], Tuple[Solution, float]]:
-    """
-    Create a closure that can be called iteratively to the simulated annealing algorithm 1 step at a time.
+class SAOptimizer:
+    def __init__(self, objective: Callable[[Solution], Number],
+                 next_temp: Callable[[], float],
+                 neighbor: Callable[[Solution], Solution],
+                 sigma0: Solution,
+                 remember_energy: bool) -> None:
+        self._objective = objective
+        self._next_temp = next_temp
+        self._neighbor = neighbor
+        self._sigma = sigma0
+        self._energy = self._objective(self._sigma)
+        self._T = self._next_temp()
+        self._remember_energy = remember_energy
+        self._solution_to_energy = {}
 
-    The provided parameters fill in the blanks in the general simulated annealing algorithm.
-    objective: Assign a value to a solution.
-    next_temp: Return the next temperature to use. Temperatures generally decrease over time.
-    neighbor: Return a solution that differs slightly from the one it is given.
-    sigma0: The starting guess.
-    return: A closure that accepts no arguments and returns the current solution along with it's value.
-    """
-    T = next_temp()
-    sigma = sigma0
+    def step(self) -> Tuple[Solution, float]:
+        """Execute 1 step of the simulated annealing algorithm."""
+        sigma_prime = self._neighbor(self._sigma)
+        self._energy = self._run_objective(self._sigma)
+        energy_prime = self._run_objective(sigma_prime)
+        if P(self._energy, energy_prime, self._T) >= np.random.rand():
+            self._sigma = sigma_prime
+            self._energy = energy_prime
+        self._T = self._next_temp()
 
-    def step() -> Tuple[Solution, float]:
-        nonlocal sigma, T
-        sigma_prime = neighbor(sigma)
-        energy = objective(sigma)
-        energy_prime = objective(sigma_prime)
-        curr_energy = energy
-        if P(energy, energy_prime, T) >= np.random.rand():
-            sigma = sigma_prime
-            curr_energy = energy_prime
-        T = next_temp()
+        return self._sigma, self._energy
 
-        return sigma, curr_energy
+    def update_solution(self, new: Solution, new_energy: Solution) -> None:
+        """Change the stored solution."""
+        self._sigma = new
+        self._energy = new_energy
 
-    return step
+    def _run_objective(self, solution: Solution) -> Number:
+        """Run the objective function or possibly return a saved value."""
+        if self._remember_energy:
+            hashable_solution = tuple(solution)
+            if hashable_solution not in self._solution_to_energy:
+                self._solution_to_energy[hashable_solution] = self._objective(solution)
+            return self._solution_to_energy[hashable_solution]
+        return self._objective(solution)
 
 
 def P(energy, energy_prime, T) -> float:
-    acceptance_prob = 1.0 if energy_prime < energy else np.exp(-(energy_prime-energy)/T)  # type: ignore
+    if energy_prime < energy:
+        acceptance_prob = 1.0
+    else:
+        acceptance_prob = np.exp(-(energy_prime-energy)/T) if T != 0 else 0
     return acceptance_prob
 
 
-def make_fast_schedule(T0: float) -> Callable:
+def make_fast_schedule(T0: float) -> Callable[[], float]:
     """Rapidly decrease the temperature."""
     num_steps = -1
 
-    def next_temp():
+    def next_temp() -> float:
         nonlocal num_steps
         num_steps += 1
         return T0 / (num_steps + 1)
