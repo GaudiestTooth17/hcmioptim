@@ -2,3 +2,4 @@ hcmioptim.egg-info/*
 dist/*
 .vscode/*
 */__pycache__/*
+build/*

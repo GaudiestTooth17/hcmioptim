@@ -10,6 +10,18 @@ class SAOptimizer:
                  neighbor: Callable[[Solution], Solution],
                  sigma0: Solution,
                  remember_energy: bool) -> None:
+        """
+        A class that lets the simulated annealing algorithm run 1 step at a time.
+
+        The provided parameters fill in the blanks in the general simulated annealing algorithm.
+        objective: Assign a value to a solution.
+        next_temp: Return the next temperature to use. Temperatures generally decrease over time.
+        neighbor: Return a solution that differs slightly from the one it is given.
+        sigma0: The starting guess.
+        remember_energy: If True, the optimizer saves the value of each solution after running the objective function and
+                        attempts to look up solutions before running the objective function. Otherwise, it just runs the
+                        objective each time.
+        """
         self._objective = objective
         self._next_temp = next_temp
         self._neighbor = neighbor
