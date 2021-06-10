@@ -1,14 +1,14 @@
-from hcmioptim.ga import Number
-from typing import Callable, Tuple
+from hcmioptim.ga._ga import Number
+from typing import Callable, Sequence, Tuple, Generic, TypeVar
 import numpy as np
-Solution = np.ndarray
+T = TypeVar('T', Sequence[int], Sequence[float], np.ndarray)
 
 
-class SAOptimizer:
-    def __init__(self, objective: Callable[[Solution], Number],
+class SAOptimizer(Generic[T]):
+    def __init__(self, objective: Callable[[T], Number],
                  next_temp: Callable[[], float],
-                 neighbor: Callable[[Solution], Solution],
-                 sigma0: Solution,
+                 neighbor: Callable[[T], T],
+                 sigma0: T,
                  remember_energy: bool) -> None:
         """
         A class that lets the simulated annealing algorithm run 1 step at a time.
@@ -31,7 +31,7 @@ class SAOptimizer:
         self._remember_energy = remember_energy
         self._solution_to_energy = {}
 
-    def step(self) -> Tuple[Solution, float]:
+    def step(self) -> Tuple[T, float]:
         """Execute 1 step of the simulated annealing algorithm."""
         sigma_prime = self._neighbor(self._sigma)
         self._energy = self._run_objective(self._sigma)
@@ -43,12 +43,12 @@ class SAOptimizer:
 
         return self._sigma, self._energy
 
-    def update_solution(self, new: Solution, new_energy: Solution) -> None:
+    def update_solution(self, new: T, new_energy: T) -> None:
         """Change the stored solution."""
         self._sigma = new
         self._energy = new_energy
 
-    def _run_objective(self, solution: Solution) -> Number:
+    def _run_objective(self, solution: T) -> Number:
         """Run the objective function or possibly return a saved value."""
         if self._remember_energy:
             hashable_solution = tuple(solution)
@@ -58,33 +58,33 @@ class SAOptimizer:
         return self._objective(solution)
 
 
-def P(energy, energy_prime, T) -> float:
+def P(energy: float, energy_prime: float, temp: float) -> float:
     if energy_prime < energy:
         acceptance_prob = 1.0
     else:
-        acceptance_prob = np.exp(-(energy_prime-energy)/T) if T != 0 else 0
+        acceptance_prob = np.exp(-(energy_prime-energy)/temp) if temp != 0 else 0
     return acceptance_prob
 
 
-def make_fast_schedule(T0: float) -> Callable[[], float]:
+def make_fast_schedule(temp0: float) -> Callable[[], float]:
     """Rapidly decrease the temperature."""
     num_steps = -1
 
     def next_temp() -> float:
         nonlocal num_steps
         num_steps += 1
-        return T0 / (num_steps + 1)
+        return temp0 / (num_steps + 1)
 
     return next_temp
 
 
-def make_linear_schedule(T0: float, delta_T: float) -> Callable[[], float]:
+def make_linear_schedule(T0: float, delta_temp: float) -> Callable[[], float]:
     """Decrease the temperature linearly."""
-    T = T0 + delta_T
+    temp = T0 + delta_temp
 
     def schedule() -> float:
-        nonlocal T
-        T -= delta_T
-        return max(0, T)
+        nonlocal temp
+        temp -= delta_temp
+        return max(0, temp)
 
     return schedule
