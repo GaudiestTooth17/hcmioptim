@@ -58,16 +58,65 @@ def _calc_normalized_fitnesses(max_fitness: Number, fitnesses: np.ndarray) -> Se
     return adjusted_fitnesses / sum_adjusted_fitnesses
 
 
-def roullete_wheel_selection(max_fitness: Number,
-                             fitness_to_genotype: Sequence[Tuple[Number, T]]) -> Tuple[T, T]:
-    """Choose two genotypes from fitness_to_genotype using the roullete wheel selection method."""
+def roulette_wheel_fitness_selection(max_fitness: Number,
+                                     fitness_to_genotype: Sequence[Tuple[Number, T]])\
+                                         -> Tuple[Tuple[T, T], ...]:
+    """
+    Create a sequence of pairings of genotypes to crossover using the roulette wheel selection method.
+    This uses fitness (cost) weighting.
+    """
     normalized_fitnesses = _calc_normalized_fitnesses(max_fitness,
                                                       np.array(tuple(x[0]
                                                                      for x in fitness_to_genotype)))
     genotypes = tuple(x[1] for x in fitness_to_genotype)
-    winners = np.random.choice(range(len(genotypes)),
-                               p=normalized_fitnesses, size=2)
-    return genotypes[winners[0]], genotypes[winners[1]]
+    inds = np.random.choice(range(len(genotypes)),
+                            p=normalized_fitnesses,
+                            size=len(fitness_to_genotype))
+    pairings = tuple((genotypes[inds[i]], genotypes[inds[i+1]])
+                     for i in range(0, len(inds), 2))
+    return pairings
+
+
+def roulette_wheel_rank_selection(fitness_to_genotype: Sequence[Tuple[Number, T]])\
+    -> Tuple[Tuple[T, T], ...]:
+    """
+    Create a sequence of pairings of genotypes to crossover using the roulette wheel selection method.
+    This uses rank weighting.
+    """
+    sorted_ftg = sorted(fitness_to_genotype, key=lambda x: x[0], reverse=True)
+    genotypes = tuple(x[1] for x in sorted_ftg)
+    N = len(fitness_to_genotype)
+    denominator = np.sum(range(1, N+1))
+    selection_probabilities = tuple((N-n+1)/denominator for n in range(1, N+1))
+    inds = np.random.choice(range(N),
+                            p=selection_probabilities,
+                            size=N)
+    pairings = tuple((genotypes[inds[i]], genotypes[inds[i]])
+                     for i in range(0, len(inds), 2))
+    return pairings
+
+
+def uniform_random_pairing_selection(fitness_to_genotype: Sequence[Tuple[Number, T]]) -> Tuple[Tuple[T, T], ...]:
+    genotypes = tuple(x[1] for x in fitness_to_genotype)
+    inds = np.random.choice(range(len(genotypes)),
+                            size=len(fitness_to_genotype))
+    pairings = tuple((genotypes[inds[i]], genotypes[inds[i+1]])
+                     for i in range(0, len(inds), 2))
+    return pairings
+
+
+def tournament_selection(fitness_to_genotype: Sequence[Tuple[Number, T]],
+                         tournament_size=2) -> Tuple[Tuple[T, T], ...]:
+    """
+    Create a sequence of pairings of genotypes to crossover using the tournament selection method.
+    """
+    inds = np.arange(len(fitness_to_genotype))
+    def run_competition():
+        competitors = np.random.choice(inds, size=tournament_size)
+        winner = max((fitness_to_genotype[c] for c in competitors), key=lambda x: x[0])[1]
+        return winner
+    pairings = tuple((run_competition(), run_competition()) for _ in range(len(inds)//2))
+    return pairings
 
 
 def single_point_crossover(alpha: T, beta: T) -> Tuple[T, T]:
