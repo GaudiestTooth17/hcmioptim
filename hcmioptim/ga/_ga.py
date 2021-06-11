@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Any, Callable, Generic, Sequence, Tuple
+from typing import Callable, Generic, Sequence, Tuple
 from hcmioptim._optim_types import T, Number, ObjectiveFunc
 # TODO: check out multiprocessing (Process and Value)
 NextGenFunc = Callable[[Sequence[Tuple[Number, T]]], Sequence[T]]
