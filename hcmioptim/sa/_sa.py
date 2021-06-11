@@ -1,15 +1,13 @@
-from hcmioptim.ga._ga import Number
-from typing import Callable, Sequence, Tuple, Generic, TypeVar
+from typing import Callable, Tuple, Generic
 import numpy as np
-T = TypeVar('T', Sequence[int], Sequence[float], np.ndarray)
-
+from hcmioptim._optim_types import T, Number
 
 class SAOptimizer(Generic[T]):
     def __init__(self, objective: Callable[[T], Number],
                  next_temp: Callable[[], float],
                  neighbor: Callable[[T], T],
-                 sigma0: T,
-                 remember_energy: bool) -> None:
+                 encoding0: T,
+                 remember_cost: bool) -> None:
         """
         A class that lets the simulated annealing algorithm run 1 step at a time.
 
@@ -17,7 +15,7 @@ class SAOptimizer(Generic[T]):
         objective: Assign a value to a solution.
         next_temp: Return the next temperature to use. Temperatures generally decrease over time.
         neighbor: Return a solution that differs slightly from the one it is given.
-        sigma0: The starting guess.
+        encoding0: The starting guess.
         remember_energy: If True, the optimizer saves the value of each solution after running the objective function and
                          attempts to look up solutions before running the objective function. Otherwise, it just runs the
                          objective each time.
@@ -25,36 +23,36 @@ class SAOptimizer(Generic[T]):
         self._objective = objective
         self._next_temp = next_temp
         self._neighbor = neighbor
-        self._sigma = sigma0
-        self._energy = self._objective(self._sigma)
+        self._encoding = encoding0
+        self._cost = self._objective(self._encoding)
         self._T = self._next_temp()
-        self._remember_energy = remember_energy
-        self._solution_to_energy = {}
+        self._remember_cost = remember_cost
+        self._encoding_to_cost = {}
 
     def step(self) -> Tuple[T, float]:
         """Execute 1 step of the simulated annealing algorithm."""
-        sigma_prime = self._neighbor(self._sigma)
-        self._energy = self._call_objective(self._sigma)
+        sigma_prime = self._neighbor(self._encoding)
+        self._cost = self._call_objective(self._encoding)
         energy_prime = self._call_objective(sigma_prime)
-        if P(self._energy, energy_prime, self._T) >= np.random.rand():
-            self._sigma = sigma_prime
-            self._energy = energy_prime
+        if P(self._cost, energy_prime, self._T) >= np.random.rand():
+            self._encoding = sigma_prime
+            self._cost = energy_prime
         self._T = self._next_temp()
 
-        return self._sigma, self._energy
+        return self._encoding, self._cost
 
     def update_solution(self, new: T, new_energy: T) -> None:
         """Change the stored solution."""
-        self._sigma = new
-        self._energy = new_energy
+        self._encoding = new
+        self._cost = new_energy
 
     def _call_objective(self, solution: T) -> Number:
         """Run the objective function or possibly return a saved value."""
-        if self._remember_energy:
+        if self._remember_cost:
             hashable_solution = tuple(solution)
-            if hashable_solution not in self._solution_to_energy:
-                self._solution_to_energy[hashable_solution] = self._objective(solution)
-            return self._solution_to_energy[hashable_solution]
+            if hashable_solution not in self._encoding_to_cost:
+                self._encoding_to_cost[hashable_solution] = self._objective(solution)
+            return self._encoding_to_cost[hashable_solution]
         return self._objective(solution)
 
 
