@@ -31,7 +31,7 @@ class GAOptimizer(Generic[T]):
 
     def step(self) -> Sequence[Tuple[Number, T]]:
         cost_to_encoding = tuple((self._call_objective(encoding), encoding)
-                                    for encoding in self._population)
+                                 for encoding in self._population)
         self._population = self._next_gen_fn(cost_to_encoding)
         return cost_to_encoding
 
