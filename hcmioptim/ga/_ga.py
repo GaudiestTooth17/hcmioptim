@@ -46,9 +46,13 @@ class GAOptimizer(Generic[T]):
 
 def _calc_cost_selection_probs(costs: np.ndarray) -> np.ndarray:
     """Return the normalized values of costs with max_cost."""
-    max_cost = np.min(costs)
+    max_cost_ind = np.argmax(costs)
+    max_cost = costs[max_cost_ind]
     normalized_costs = costs - max_cost
-    P_n = normalized_costs / np.sum(costs)
+    denominator = np.sum(normalized_costs[:max_cost_ind]) + np.sum(normalized_costs[max_cost_ind:])
+    if denominator == 0:
+        return np.zeros(costs.shape[0], dtype=np.float64)
+    P_n = np.abs(normalized_costs / denominator)
     return P_n
 
 
@@ -88,6 +92,7 @@ def roulette_wheel_rank_selection(cost_to_encoding: Sequence[Tuple[Number, T]])\
 
 def uniform_random_pairing_selection(cost_to_encoding: Sequence[Tuple[Number, T]])\
     -> Tuple[Tuple[T, T], ...]:
+    """Select parent pairs uniformly at random from the population. I think it's trash TBH."""
     encodings = tuple(x[1] for x in cost_to_encoding)
     inds = np.random.choice(range(len(encodings)),
                             size=len(cost_to_encoding))

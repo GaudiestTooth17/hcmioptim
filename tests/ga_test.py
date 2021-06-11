@@ -2,29 +2,28 @@ from typing import Sequence, Tuple
 from itertools import product
 from unittest import TestCase
 import numpy as np
-from hcmioptim.ga import Number, make_optimizer, Genotype, roulette_wheel_selection, single_point_crossover
+from hcmioptim import ga
+from hcmioptim._optim_types import T, Number
 
 
-def test_mutate(population: Sequence[Genotype], prob: float) -> None:
-    for i, j in product(range(len(population)), range(population[0].shape[0])):
+def mutate(population: Sequence[T], prob: float) -> None:
+    for i, j in product(range(len(population)), range(len(population[0]))):
         if np.random.rand() < prob:
-            population[i][j] += np.random.choice((-1, 1))
+            population[i][j] += np.random.choice((-1, 1))  # type: ignore
 
 
-def test_fitness(genotype: Genotype) -> int:
-    size = genotype.shape[0]
-    fitness = 10*size
+def cost(genotype: T) -> int:
+    cost = 0
     for i, gene in enumerate(genotype):
-        fitness -= np.abs(i-gene)
-    return fitness
+        cost += np.abs(i-gene)
+    return cost
 
 
-def test_next_gen(max_fitness, population: Sequence[Tuple[Number, Genotype]]) -> Sequence[Genotype]:
-    parent_pairs = (roulette_wheel_selection(max_fitness, population)
-                    for i in range(len(population)//2))
-    child_pairs = (single_point_crossover(couple[0], couple[1]) for couple in parent_pairs)
+def next_gen(population: Sequence[Tuple[Number, T]]) -> Sequence[T]:
+    parent_pairs = ga.roulette_wheel_cost_selection(population)
+    child_pairs = (ga.single_point_crossover(couple[0], couple[1]) for couple in parent_pairs)
     children = tuple(child for pair in child_pairs for child in pair)
-    test_mutate(children, .25)
+    mutate(children, .25)
     return children
 
 
@@ -33,16 +32,16 @@ class TestGA(TestCase):
         pop_size = 50
         sequence_length = 10
         expected = np.array(range(sequence_length))
-        max_fitness = test_fitness(expected)
-        max_steps = 1000
+        max_steps = 3000
         population = [np.abs(np.random.randint(sequence_length, size=sequence_length))
                       for _ in range(pop_size)]
-        optimizer_step = make_optimizer(test_fitness, test_next_gen, max_fitness, population)
+        optimizer = ga.GAOptimizer(cost, next_gen, population, True)
 
         for _ in range(max_steps):
-            population_with_fitness = optimizer_step()
+            population_with_fitness = optimizer.step()
 
-        best_answer = max(population_with_fitness, key=lambda x: x[0])[1]  # type: ignore
+        best_answer = min(population_with_fitness, key=lambda x: x[0])[1]  # type: ignore
 
         # This assertion leaves a little wiggle room for answers that aren't completely right
-        self.assertTrue(np.sum(np.abs(best_answer-expected)) < 5, f'{best_answer} != {expected}')
+        # self.assertTrue(np.sum(np.abs(best_answer-expected)) < 5, f'{best_answer} != {expected}')
+        self.assertTrue(np.sum(best_answer-expected) == 0, f'{best_answer} != {expected}')
