@@ -19,8 +19,8 @@ class SAOptimizer(Generic[T]):
         neighbor: Return a solution that differs slightly from the one it is given.
         sigma0: The starting guess.
         remember_energy: If True, the optimizer saves the value of each solution after running the objective function and
-                        attempts to look up solutions before running the objective function. Otherwise, it just runs the
-                        objective each time.
+                         attempts to look up solutions before running the objective function. Otherwise, it just runs the
+                         objective each time.
         """
         self._objective = objective
         self._next_temp = next_temp
@@ -34,8 +34,8 @@ class SAOptimizer(Generic[T]):
     def step(self) -> Tuple[T, float]:
         """Execute 1 step of the simulated annealing algorithm."""
         sigma_prime = self._neighbor(self._sigma)
-        self._energy = self._run_objective(self._sigma)
-        energy_prime = self._run_objective(sigma_prime)
+        self._energy = self._call_objective(self._sigma)
+        energy_prime = self._call_objective(sigma_prime)
         if P(self._energy, energy_prime, self._T) >= np.random.rand():
             self._sigma = sigma_prime
             self._energy = energy_prime
@@ -48,7 +48,7 @@ class SAOptimizer(Generic[T]):
         self._sigma = new
         self._energy = new_energy
 
-    def _run_objective(self, solution: T) -> Number:
+    def _call_objective(self, solution: T) -> Number:
         """Run the objective function or possibly return a saved value."""
         if self._remember_energy:
             hashable_solution = tuple(solution)

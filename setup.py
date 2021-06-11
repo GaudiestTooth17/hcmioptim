@@ -10,7 +10,7 @@ README = (HERE / 'README.md').read_text()
 
 setup(
     name='hcmioptim',
-    version='0.0.4',
+    version='0.0.5',
     description='A collection of useful heuristic based optimization algorithms.',
     long_description_content_type='text/markdown',
     long_description=README,
