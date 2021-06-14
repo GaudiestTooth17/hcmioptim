@@ -62,6 +62,8 @@ def roulette_wheel_cost_selection(cost_to_encoding: Sequence[Tuple[Number, T]]) 
     This uses cost weighting.
     """
     P_n = _calc_cost_selection_probs(np.array(tuple(x[0] for x in cost_to_encoding)))
+    if np.sum(P_n) == 0:
+        P_n = np.ones(len(cost_to_encoding), dtype=np.float64) / len(cost_to_encoding)
     encodings = tuple(x[1] for x in cost_to_encoding)
     inds = np.random.choice(range(len(encodings)),
                             p=P_n,
