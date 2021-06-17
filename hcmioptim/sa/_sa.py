@@ -1,12 +1,13 @@
-from typing import Callable, Tuple, Generic
+from typing import Callable, Tuple
 import numpy as np
-from hcmioptim._optim_types import T, Number
+from hcmioptim._optim_types import Number
 
-class SAOptimizer(Generic[T]):
-    def __init__(self, objective: Callable[[T], Number],
+
+class SAOptimizer():
+    def __init__(self, objective: Callable[[np.ndarray], Number],
                  next_temp: Callable[[], float],
-                 neighbor: Callable[[T], T],
-                 encoding0: T,
+                 neighbor: Callable[[np.ndarray], np.ndarray],
+                 encoding0: np.ndarray,
                  remember_cost: bool) -> None:
         """
         A class that lets the simulated annealing algorithm run 1 step at a time.
@@ -16,9 +17,9 @@ class SAOptimizer(Generic[T]):
         next_temp: Return the next temperature to use. Temperatures generally decrease over time.
         neighbor: Return a solution that differs slightly from the one it is given.
         encoding0: The starting guess.
-        remember_energy: If True, the optimizer saves the value of each solution after running the objective function and
-                         attempts to look up solutions before running the objective function. Otherwise, it just runs the
-                         objective each time.
+        remember_energy: If True, the optimizer saves the value of each solution after running the
+                         objective function and attempts to look up solutions before running the
+                         objective function. Otherwise, it just runs the objective each time.
         """
         self._objective = objective
         self._next_temp = next_temp
@@ -29,7 +30,7 @@ class SAOptimizer(Generic[T]):
         self._remember_cost = remember_cost
         self._encoding_to_cost = {}
 
-    def step(self) -> Tuple[T, float]:
+    def step(self) -> Tuple[np.ndarray, float]:
         """Execute 1 step of the simulated annealing algorithm."""
         sigma_prime = self._neighbor(self._encoding)
         self._cost = self._call_objective(self._encoding)
@@ -41,12 +42,12 @@ class SAOptimizer(Generic[T]):
 
         return self._encoding, self._cost
 
-    def update_solution(self, new: T, new_energy: T) -> None:
+    def update_solution(self, new: np.ndarray, new_energy: np.ndarray) -> None:
         """Change the stored solution."""
         self._encoding = new
         self._cost = new_energy
 
-    def _call_objective(self, solution: T) -> Number:
+    def _call_objective(self, solution: np.ndarray) -> Number:
         """Run the objective function or possibly return a saved value."""
         if self._remember_cost:
             hashable_solution = tuple(solution)

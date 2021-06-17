@@ -1,14 +1,14 @@
 import numpy as np
-from typing import Callable, Generic, Sequence, Tuple
-from hcmioptim._optim_types import T, Number, ObjectiveFunc
+from typing import Callable, Sequence, Tuple
+from hcmioptim._optim_types import Number, ObjectiveFunc
 # TODO: check out multiprocessing (Process and Value)
-NextGenFunc = Callable[[Sequence[Tuple[Number, T]]], Sequence[T]]
+NextGenFunc = Callable[[Sequence[Tuple[Number, np.ndarray]]], Sequence[np.ndarray]]
 
 
-class GAOptimizer(Generic[T]):
+class GAOptimizer:
     def __init__(self, objective: ObjectiveFunc,
                  next_gen_fn: NextGenFunc,
-                 starting_population: Sequence[T],
+                 starting_population: Sequence[np.ndarray],
                  remember_cost: bool) -> None:
         """
         A class that lets a genetic algorithm run one step at a time.
@@ -21,7 +21,7 @@ class GAOptimizer(Generic[T]):
         remember_cost: If True, the optimizer saves the cost of each encoding that passes
                           through the cost function. If a encoding has already been through,
                           the cost function is not run and the saved value is returned. If False,
-                          the cost function is run each time. 
+                          the cost function is run each time.
         """
         self._objective = objective
         self._next_gen_fn = next_gen_fn
@@ -29,13 +29,13 @@ class GAOptimizer(Generic[T]):
         self._remember_cost = remember_cost
         self._encoding_to_cost = {}
 
-    def step(self) -> Sequence[Tuple[Number, T]]:
+    def step(self) -> Sequence[Tuple[Number, np.ndarray]]:
         cost_to_encoding = tuple((self._call_objective(encoding), encoding)
                                  for encoding in self._population)
         self._population = self._next_gen_fn(cost_to_encoding)
         return cost_to_encoding
 
-    def _call_objective(self, encoding: T) -> Number:
+    def _call_objective(self, encoding: np.ndarray) -> Number:
         if self._remember_cost:
             hashable_encoding = tuple(encoding)
             if hashable_encoding not in self._encoding_to_cost:
@@ -56,7 +56,8 @@ def _calc_cost_selection_probs(costs: np.ndarray) -> np.ndarray:
     return P_n
 
 
-def roulette_wheel_cost_selection(cost_to_encoding: Sequence[Tuple[Number, T]]) -> Tuple[Tuple[T, T], ...]:
+def roulette_wheel_cost_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]])\
+        -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
     """
     Create a sequence of pairings of encodings to crossover using the roulette wheel selection method.
     This uses cost weighting.
@@ -73,8 +74,8 @@ def roulette_wheel_cost_selection(cost_to_encoding: Sequence[Tuple[Number, T]]) 
     return pairings
 
 
-def roulette_wheel_rank_selection(cost_to_encoding: Sequence[Tuple[Number, T]])\
-    -> Tuple[Tuple[T, T], ...]:
+def roulette_wheel_rank_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]])\
+        -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
     """
     Create a sequence of pairings of encodings to crossover using the roulette wheel selection method.
     This uses rank weighting.
@@ -92,8 +93,8 @@ def roulette_wheel_rank_selection(cost_to_encoding: Sequence[Tuple[Number, T]])\
     return pairings
 
 
-def uniform_random_pairing_selection(cost_to_encoding: Sequence[Tuple[Number, T]])\
-    -> Tuple[Tuple[T, T], ...]:
+def uniform_random_pairing_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]])\
+        -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
     """Select parent pairs uniformly at random from the population. I think it's trash TBH."""
     encodings = tuple(x[1] for x in cost_to_encoding)
     inds = np.random.choice(range(len(encodings)),
@@ -103,21 +104,24 @@ def uniform_random_pairing_selection(cost_to_encoding: Sequence[Tuple[Number, T]
     return pairings
 
 
-def tournament_selection(cost_to_encoding: Sequence[Tuple[Number, T]],
-                         tournament_size=2) -> Tuple[Tuple[T, T], ...]:
+def tournament_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]],
+                         tournament_size=2) -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
     """
     Create a sequence of pairings of encodings to crossover using the tournament selection method.
     """
     inds = np.arange(len(cost_to_encoding))
+
     def run_competition():
         competitors = np.random.choice(inds, size=tournament_size)
         winner = min((cost_to_encoding[c] for c in competitors), key=lambda x: x[0])[1]
         return winner
+
     pairings = tuple((run_competition(), run_competition()) for _ in range(len(inds)//2))
     return pairings
 
 
-def single_point_crossover(alpha: T, beta: T) -> Tuple[T, T]:
+def single_point_crossover(alpha: np.ndarray, beta: np.ndarray)\
+        -> Tuple[np.ndarray, np.ndarray]:
     """
     Recombine encodings alpha and beta.
 
@@ -140,5 +144,5 @@ def single_point_crossover(alpha: T, beta: T) -> Tuple[T, T]:
         constructor = list if isinstance(alpha, list) else tuple
         child0 = constructor(alpha[i] if i < locus else beta[i] for i in range(size))
         child1 = constructor(beta[i] if i < locus else alpha[i] for i in range(size))
-    
+
     return child0, child1  # type: ignore
