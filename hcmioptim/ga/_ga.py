@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Callable, Sequence, Tuple
 from hcmioptim._optim_types import Number, ObjectiveFunc
-# TODO: check out multiprocessing (Process and Value)
+from multiprocessing import Pool
 NextGenFunc = Callable[[Sequence[Tuple[Number, np.ndarray]]], Sequence[np.ndarray]]
 
 
@@ -9,7 +9,8 @@ class GAOptimizer:
     def __init__(self, objective: ObjectiveFunc,
                  next_gen_fn: NextGenFunc,
                  starting_population: Sequence[np.ndarray],
-                 remember_cost: bool) -> None:
+                 remember_cost: bool,
+                 num_processes=1) -> None:
         """
         A class that lets a genetic algorithm run one step at a time.
 
@@ -28,10 +29,17 @@ class GAOptimizer:
         self._population = starting_population
         self._remember_cost = remember_cost
         self._encoding_to_cost = {}
+        self._num_processes = num_processes
 
     def step(self) -> Sequence[Tuple[Number, np.ndarray]]:
-        cost_to_encoding = tuple((self._call_objective(encoding), encoding)
-                                 for encoding in self._population)
+        if self._num_processes <= 1:
+            cost_to_encoding = tuple((self._call_objective(encoding), encoding)
+                                     for encoding in self._population)
+        else:
+            with Pool(self._num_processes) as p:
+                cost_to_encoding = p.map(_rate_encoding,
+                                         ((self._call_objective, encoding)
+                                          for encoding in self._population))
         self._population = self._next_gen_fn(cost_to_encoding)
         return cost_to_encoding
 
@@ -42,6 +50,11 @@ class GAOptimizer:
                 self._encoding_to_cost[hashable_encoding] = self._objective(encoding)
             return self._encoding_to_cost[hashable_encoding]
         return self._objective(encoding)
+
+
+def _rate_encoding(args) -> Tuple[Number, np.ndarray]:
+    objective, encoding = args
+    return (objective(encoding), encoding)
 
 
 def _calc_cost_selection_probs(costs: np.ndarray) -> np.ndarray:
