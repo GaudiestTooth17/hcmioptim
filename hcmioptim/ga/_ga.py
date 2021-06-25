@@ -1,7 +1,8 @@
 import numpy as np
-from typing import Callable, Sequence, Tuple
+from typing import Callable, Sequence, Tuple, List
 from hcmioptim._optim_types import Number, ObjectiveFunc
 from multiprocessing import Pool
+import itertools as it
 NextGenFunc = Callable[[Sequence[Tuple[Number, np.ndarray]]], Sequence[np.ndarray]]
 
 
@@ -20,9 +21,9 @@ class GAOptimizer:
                      and return a vector of encodings to be the next generation.
         starting_population: The population of encodings that the optimizer begins with.
         remember_cost: If True, the optimizer saves the cost of each encoding that passes
-                          through the cost function. If a encoding has already been through,
-                          the cost function is not run and the saved value is returned. If False,
-                          the cost function is run each time.
+                       through the cost function. If a encoding has already been through,
+                       the cost function is not run and the saved value is returned. If False,
+                       the cost function is run each time.
         """
         self._objective = objective
         self._next_gen_fn = next_gen_fn
@@ -36,10 +37,19 @@ class GAOptimizer:
             cost_to_encoding = tuple((self._call_objective(encoding), encoding)
                                      for encoding in self._population)
         else:
+            # divide up work between the processes
+            encodings_per_process = len(self._population) // self._num_processes
+            leftover = len(self._population) % self._num_processes
+            boundaries = [[i, i+encodings_per_process]
+                          for i in range(0, len(self._population)-leftover, encodings_per_process)]
+            boundaries[-1][1] += leftover
+            # run the processes to get a list of lists
             with Pool(self._num_processes) as p:
-                cost_to_encoding = p.map(_rate_encoding,
-                                         ((self._call_objective, encoding)
-                                          for encoding in self._population))
+                cost_to_encoding = p.map(_rate_multiple_encodings,
+                                         ((self._call_objective, self._population[i:j])
+                                          for i, j in boundaries))
+            # flatten the list
+            cost_to_encoding = list(it.chain(*cost_to_encoding))
         self._population = self._next_gen_fn(cost_to_encoding)
         return cost_to_encoding
 
@@ -55,6 +65,11 @@ class GAOptimizer:
 def _rate_encoding(args) -> Tuple[Number, np.ndarray]:
     objective, encoding = args
     return (objective(encoding), encoding)
+
+
+def _rate_multiple_encodings(args) -> List[Tuple[Number, np.ndarray]]:
+    objective, encodings = args
+    return [(objective(encoding), encoding) for encoding in encodings]
 
 
 def _calc_cost_selection_probs(costs: np.ndarray) -> np.ndarray:
