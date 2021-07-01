@@ -37,19 +37,11 @@ class GAOptimizer:
             cost_to_encoding = tuple((self._call_objective(encoding), encoding)
                                      for encoding in self._population)
         else:
-            # divide up work between the processes
-            encodings_per_process = len(self._population) // self._num_processes
-            leftover = len(self._population) % self._num_processes
-            boundaries = [[i, i+encodings_per_process]
-                          for i in range(0, len(self._population)-leftover, encodings_per_process)]
-            boundaries[-1][1] += leftover
-            # run the processes to get a list of lists
             with Pool(self._num_processes) as p:
-                cost_to_encoding = p.map(_rate_multiple_encodings,
-                                         ((self._call_objective, self._population[i:j])
-                                          for i, j in boundaries))
-            # flatten the list
-            cost_to_encoding = list(it.chain(*cost_to_encoding))
+                cost_to_encoding = p.map(_rate_encoding,
+                                         ((self._call_objective, encoding)
+                                          for encoding in self._population),
+                                         len(self._population)//self._num_processes)
         self._population = self._next_gen_fn(cost_to_encoding)
         return cost_to_encoding
 
@@ -67,11 +59,6 @@ def _rate_encoding(args) -> Tuple[Number, np.ndarray]:
     return (objective(encoding), encoding)
 
 
-def _rate_multiple_encodings(args) -> List[Tuple[Number, np.ndarray]]:
-    objective, encodings = args
-    return [(objective(encoding), encoding) for encoding in encodings]
-
-
 def _calc_cost_selection_probs(costs: np.ndarray) -> np.ndarray:
     """Return the normalized values of costs with max_cost."""
     max_cost_ind = np.argmax(costs)
@@ -87,7 +74,8 @@ def _calc_cost_selection_probs(costs: np.ndarray) -> np.ndarray:
 def roulette_wheel_cost_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]])\
         -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
     """
-    Create a sequence of pairings of encodings to crossover using the roulette wheel selection method.
+    Create a sequence of pairings of encodings to crossover using
+    the roulette wheel selection method.
     This uses cost weighting.
     """
     P_n = _calc_cost_selection_probs(np.array(tuple(x[0] for x in cost_to_encoding)))
@@ -105,7 +93,8 @@ def roulette_wheel_cost_selection(cost_to_encoding: Sequence[Tuple[Number, np.nd
 def roulette_wheel_rank_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]])\
         -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
     """
-    Create a sequence of pairings of encodings to crossover using the roulette wheel selection method.
+    Create a sequence of pairings of encodings to crossover using
+    the roulette wheel selection method.
     This uses rank weighting.
     """
     sorted_ftg = sorted(cost_to_encoding, key=lambda x: x[0])
