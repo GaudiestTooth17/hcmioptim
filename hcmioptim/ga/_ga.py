@@ -31,6 +31,7 @@ class GAOptimizer:
         self._remember_cost = remember_cost
         self._encoding_to_cost = {}
         self._num_processes = num_processes
+        self._n_cache_hits = 0  # records the number of hits _encoding_to_cost has had
 
     def step(self) -> Sequence[Tuple[Number, np.ndarray]]:
         if self._num_processes <= 1:
@@ -50,8 +51,14 @@ class GAOptimizer:
             hashable_encoding = tuple(encoding)
             if hashable_encoding not in self._encoding_to_cost:
                 self._encoding_to_cost[hashable_encoding] = self._objective(encoding)
+            else:
+                self._n_cache_hits += 1
             return self._encoding_to_cost[hashable_encoding]
         return self._objective(encoding)
+
+    @property
+    def num_cache_hits(self) -> int:
+        return self._n_cache_hits
 
 
 def _rate_encoding(args) -> Tuple[Number, np.ndarray]:
