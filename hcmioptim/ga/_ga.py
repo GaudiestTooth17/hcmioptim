@@ -1,8 +1,7 @@
 import numpy as np
-from typing import Callable, Sequence, Tuple, List
+from typing import Callable, Sequence, Tuple
 from hcmioptim._optim_types import Number, ObjectiveFunc
 from multiprocessing import Pool
-import itertools as it
 NextGenFunc = Callable[[Sequence[Tuple[Number, np.ndarray]]], Sequence[np.ndarray]]
 
 
@@ -144,8 +143,7 @@ def tournament_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]],
     return pairings
 
 
-def single_point_crossover(alpha: np.ndarray, beta: np.ndarray)\
-        -> Tuple[np.ndarray, np.ndarray]:
+def single_point_crossover(alpha: np.ndarray, beta: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     Recombine encodings alpha and beta.
 
@@ -158,15 +156,70 @@ def single_point_crossover(alpha: np.ndarray, beta: np.ndarray)\
     """
     size = len(alpha)
     locus = np.random.randint(size)
-    if isinstance(alpha, np.ndarray):
-        type_ = alpha.dtype
-        child0 = np.zeros(size, dtype=type_)
-        child1 = np.zeros(size, dtype=type_)
-        child0[:locus], child0[locus:] = alpha[:locus], beta[locus:]
-        child1[:locus], child1[locus:] = beta[:locus], alpha[locus:]
-    else:
-        constructor = list if isinstance(alpha, list) else tuple
-        child0 = constructor(alpha[i] if i < locus else beta[i] for i in range(size))
-        child1 = constructor(beta[i] if i < locus else alpha[i] for i in range(size))
+    type_ = alpha.dtype
+    child0 = np.zeros(size, dtype=type_)
+    child1 = np.zeros(size, dtype=type_)
+    child0[:locus], child0[locus:] = alpha[:locus], beta[locus:]
+    child1[:locus], child1[locus:] = beta[:locus], alpha[locus:]
 
-    return child0, child1  # type: ignore
+    return child0, child1
+
+
+def cycle_crossover(alpha: np.ndarray, beta: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Recombine encodings alpha and beta while ensuring neither have duplicate entries.
+    Use this for combinatorial problems.
+
+    Exchange the first value in alpha with the first value in beta. If there are duplicates
+    in alpha (and thus beta), exchange the original duplicate value with the value in beta
+    at the same index. Continue this process until there are no duplicates.
+    """
+    child0: np.ndarray = np.copy(alpha)
+    child1: np.ndarray = np.copy(beta)
+    child0[0], child1[0] = child1[0], child0[0]
+    swapped_indices = {0}
+
+    while has_duplicate_values(child0):
+        # find original duplicate
+        seen_values = set(child0[i] for i in swapped_indices)
+        for i in (i for i in range(len(child0)) if i not in swapped_indices):
+            # There is no need to update seen_values because the only time a duplicate
+            # could enter is when swapping occurs.
+            if child0[i] in seen_values:
+                child0[i], child1[i] = child1[i], child0[i]
+                swapped_indices.add(i)
+                break
+
+    return child0, child1
+
+
+def bitset_cross_over(alpha: np.ndarray, beta: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Recombine encodings alpha and beta while keeping the sum constant. This can
+    be used for bitset encodings. It is assumed that sum(alpha) == sum(beta).
+
+    Choose swap the values between two randomly chosen locations. While
+    sum(child) != sum(parent), swap the values at each index in the children
+    starting at the index directly after the last one originally swapped, continuing
+    to the end, and wrapping around to the beginning.
+    """
+    genotype_len = len(alpha)
+    child0: np.ndarray = np.copy(alpha)
+    child1: np.ndarray = np.copy(beta)
+    locii = np.random.randint(genotype_len, size=2)
+    locus0 = np.min(locii)
+    locus1 = np.max(locii)
+    child0[locus0:locus1], child1[locus0:locus1] = child1[locus0:locus1], child0[locus0:locus1]
+
+    i = locus1
+    alpha_sum = np.sum(alpha)
+    while np.sum(child0) - alpha_sum != 0:
+        child0[i], child1[i] = child1[i], child0[i]
+        i = (i+1) % genotype_len
+
+    return child0, child1
+
+
+def has_duplicate_values(array: np.ndarray):
+    s = np.sort(array)
+    return (s == np.append(s[1:], s[0])).any()
