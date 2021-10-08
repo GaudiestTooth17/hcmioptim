@@ -1,5 +1,7 @@
-hcmioptim.egg-info/*
+krug.egg-info/*
 dist/*
 .vscode/*
 *__pycache__*
 build/*
+tests/__pycache__
+krug/__pycache__

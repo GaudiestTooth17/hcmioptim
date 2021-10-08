@@ -1,6 +1,6 @@
 from typing import Callable, Tuple
 import numpy as np
-from hcmioptim._optim_types import Number
+from krug._optim_types import Number
 
 
 class SAOptimizer():

@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Callable, Sequence, Tuple
-from hcmioptim._optim_types import Number, ObjectiveFunc
+from krug._optim_types import Number, ObjectiveFunc
 from multiprocessing import Pool
 NextGenFunc = Callable[[Sequence[Tuple[Number, np.ndarray]]], Sequence[np.ndarray]]
 
