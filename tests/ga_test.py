@@ -2,8 +2,8 @@ from typing import Sequence, Tuple
 from itertools import product
 from unittest import TestCase
 import numpy as np
-from hcmioptim import ga
-from hcmioptim._optim_types import T, Number
+from krug import ga
+from krug._optim_types import T, Number
 
 
 def mutate(population: Sequence[T], prob: float) -> None:

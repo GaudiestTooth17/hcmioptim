@@ -1,6 +1,6 @@
 from unittest import TestCase
 import numpy as np
-from hcmioptim.sa import SAOptimizer, make_fast_schedule
+from krug.sa import SAOptimizer, make_fast_schedule
 
 
 def sequence_objective(sigma: np.ndarray) -> int:
