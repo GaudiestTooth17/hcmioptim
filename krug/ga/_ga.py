@@ -3,6 +3,7 @@ from typing import Callable, Sequence, Tuple
 from krug._optim_types import Number, ObjectiveFunc
 from multiprocessing import Pool
 NextGenFunc = Callable[[Sequence[Tuple[Number, np.ndarray]]], Sequence[np.ndarray]]
+RNG = np.random.default_rng()
 
 
 class GAOptimizer:
@@ -77,7 +78,7 @@ def _calc_cost_selection_probs(costs: np.ndarray) -> np.ndarray:
     return P_n
 
 
-def roulette_wheel_cost_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]])\
+def roulette_wheel_cost_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]], rng=RNG)\
         -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
     """
     Create a sequence of pairings of encodings to crossover using
@@ -88,15 +89,15 @@ def roulette_wheel_cost_selection(cost_to_encoding: Sequence[Tuple[Number, np.nd
     if np.sum(P_n) == 0:
         P_n = np.ones(len(cost_to_encoding), dtype=np.float64) / len(cost_to_encoding)
     encodings = tuple(x[1] for x in cost_to_encoding)
-    inds = np.random.choice(range(len(encodings)),
-                            p=P_n,
-                            size=len(cost_to_encoding))
+    inds = rng.choice(range(len(encodings)),
+                      p=P_n,
+                      size=len(cost_to_encoding))
     pairings = tuple((encodings[inds[i]], encodings[inds[i+1]])
                      for i in range(0, len(inds), 2))
     return pairings
 
 
-def roulette_wheel_rank_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]])\
+def roulette_wheel_rank_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]], rng=RNG)\
         -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
     """
     Create a sequence of pairings of encodings to crossover using
@@ -106,44 +107,60 @@ def roulette_wheel_rank_selection(cost_to_encoding: Sequence[Tuple[Number, np.nd
     sorted_ftg = sorted(cost_to_encoding, key=lambda x: x[0])
     encodings = tuple(x[1] for x in sorted_ftg)
     N = len(cost_to_encoding)
-    denominator = np.sum(range(1, N+1))
+    denominator = sum(range(1, N+1))
     selection_probabilities = tuple((N-n+1)/denominator for n in range(1, N+1))
-    inds = np.random.choice(range(N),
-                            p=selection_probabilities,
-                            size=N)
-    pairings = tuple((encodings[inds[i]], encodings[inds[i]])
+    inds = rng.choice(range(N),
+                      p=selection_probabilities,
+                      size=N)
+    pairings = tuple((encodings[inds[i]], encodings[inds[i+1]])
                      for i in range(0, len(inds), 2))
     return pairings
 
 
-def uniform_random_pairing_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]])\
-        -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
+def uniform_random_pairing_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]],
+                                     rng=RNG) -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
     """Select parent pairs uniformly at random from the population. I think it's trash TBH."""
     encodings = tuple(x[1] for x in cost_to_encoding)
-    inds = np.random.choice(range(len(encodings)),
-                            size=len(cost_to_encoding))
+    inds = rng.choice(range(len(encodings)),
+                      size=len(cost_to_encoding))
     pairings = tuple((encodings[inds[i]], encodings[inds[i+1]])
                      for i in range(0, len(inds), 2))
     return pairings
 
 
 def tournament_selection(cost_to_encoding: Sequence[Tuple[Number, np.ndarray]],
-                         tournament_size=2) -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
+                         tournament_size=2, rng=RNG) -> Tuple[Tuple[np.ndarray, np.ndarray], ...]:
     """
     Create a sequence of pairings of encodings to crossover using the tournament selection method.
+
+    tournament_size: How many uniformly randomly selected genotypes get compared in each tournament.
+                     len(cost_to_encoding) must be divisible by tournament_size.
     """
     inds = np.arange(len(cost_to_encoding))
 
-    def run_competition():
-        competitors = np.random.choice(inds, size=tournament_size)
-        winner = min((cost_to_encoding[c] for c in competitors), key=lambda x: x[0])[1]
-        return winner
+    # I decided to try a different approach so that it would hopefully run faster
+    # def run_competition():
+    #     competitors = rng.choice(inds, size=tournament_size)
+    #     winner = min((cost_to_encoding[c] for c in competitors), key=lambda x: x[0])[1]
+    #     return winner
+    # pairings = tuple((run_competition(), run_competition()) for _ in range(len(inds)//2))
 
-    pairings = tuple((run_competition(), run_competition()) for _ in range(len(inds)//2))
+    # There needs to be len(inds) genotype pairings. Each of these pairings is selected from a
+    # tournament, this gives the size parameter.
+    tournament_indices: Sequence[int] = rng.choice(inds, size=len(inds)*tournament_size)
+    grouped_indices = (tournament_indices[i:i+tournament_size]
+                       for i in range(0,
+                                      len(tournament_indices),
+                                      tournament_size))
+    tournament_groups = tuple((cost_to_encoding[i] for i in group) for group in grouped_indices)
+    pairings = tuple((min(tournament_groups[i], key=lambda x: x[0])[1],
+                      min(tournament_groups[i+1], key=lambda x: x[0])[1])
+                     for i in range(0, len(tournament_groups), 2))
     return pairings
 
 
-def single_point_crossover(alpha: np.ndarray, beta: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def single_point_crossover(alpha: np.ndarray, beta: np.ndarray,
+                           rng=RNG) -> Tuple[np.ndarray, np.ndarray]:
     """
     Recombine encodings alpha and beta.
 
@@ -155,7 +172,7 @@ def single_point_crossover(alpha: np.ndarray, beta: np.ndarray) -> Tuple[np.ndar
     return: the two children
     """
     size = len(alpha)
-    locus = np.random.randint(size)
+    locus = rng.integers(size)
     type_ = alpha.dtype
     child0 = np.zeros(size, dtype=type_)
     child1 = np.zeros(size, dtype=type_)
@@ -186,14 +203,17 @@ def cycle_crossover(alpha: np.ndarray, beta: np.ndarray) -> Tuple[np.ndarray, np
             # There is no need to update seen_values because the only time a duplicate
             # could enter is when swapping occurs.
             if child0[i] in seen_values:
-                child0[i], child1[i] = child1[i], child0[i]
+                child0_val = child0[i]
+                child0[i] = child1[i]
+                child1[i] = child0_val
                 swapped_indices.add(i)
                 break
 
     return child0, child1
 
 
-def bitset_cross_over(alpha: np.ndarray, beta: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def bitset_crossover(alpha: np.ndarray, beta: np.ndarray, rng=RNG)\
+        -> Tuple[np.ndarray, np.ndarray]:
     """
     Recombine encodings alpha and beta while keeping the sum constant. This can
     be used for bitset encodings. It is assumed that sum(alpha) == sum(beta).
@@ -206,16 +226,22 @@ def bitset_cross_over(alpha: np.ndarray, beta: np.ndarray) -> Tuple[np.ndarray, 
     genotype_len = len(alpha)
     child0: np.ndarray = np.copy(alpha)
     child1: np.ndarray = np.copy(beta)
-    locii = np.random.randint(genotype_len, size=2)
+    locii = rng.integers(genotype_len, size=2)
     locus0 = np.min(locii)
     locus1 = np.max(locii)
-    child0[locus0:locus1], child1[locus0:locus1] = child1[locus0:locus1], child0[locus0:locus1]
+    child0[locus0:locus1], child1[locus0:locus1]\
+        = beta[locus0:locus1].copy(), alpha[locus0:locus1].copy()
 
-    i = locus1
-    alpha_sum = np.sum(alpha)
-    while np.sum(child0) - alpha_sum != 0:
-        child0[i], child1[i] = child1[i], child0[i]
-        i = (i+1) % genotype_len
+    difference = np.sum(child0) - np.sum(child1)
+    if difference != 0:
+        child_with_excess = child0 if difference > 0 else child1
+        child_with_deficit = child1 if difference > 0 else child0
+        swapple_indices = np.where((child_with_excess > 0) & (child_with_deficit == 0))[0]
+        rng.shuffle(swapple_indices)
+        to_swap = swapple_indices[:abs(difference)//2]
+        for i in to_swap:
+            child_with_excess[i] = 1 - child_with_excess[i]
+            child_with_deficit[i] = 1 - child_with_deficit[i]
 
     return child0, child1
 
